@@ -104,7 +104,7 @@ class BattleArena extends Phaser.Scene {
       .setOrigin(0, 0)
       .setDepth(10)
       .setVisible(false);
-    this.pauseText = this.add.text(this.scale.width/2, this.scale.height/2, "Game Paused\nPress P to Resume", {
+    this.pauseText = this.add.text(this.scale.width / 2, this.scale.height / 2, "Game Paused\nPress P to Resume", {
       fontSize: "32px",
       fill: "#fff",
       align: "center"
@@ -180,7 +180,7 @@ class BattleArena extends Phaser.Scene {
     // Dev mode toggle and adjustments.
     if (Phaser.Input.Keyboard.JustDown(this.keyD)) {
       this.devMode = !this.devMode;
-      if(this.devText) {
+      if (this.devText) {
         this.devText.setVisible(this.devMode);
       }
     }
@@ -205,7 +205,7 @@ class BattleArena extends Phaser.Scene {
         this.baseShots = Math.max(1, this.baseShots - 1);
         this.playerShots = this.baseShots;
       }
-      if(this.devText) {
+      if (this.devText) {
         this.devText.setText(
           "Dev Mode:\nSpeed: " + this.playerSpeed +
           "\nDamage: " + this.playerDamage +
@@ -259,6 +259,7 @@ class BattleArena extends Phaser.Scene {
     }
   }
 
+  // Manual collision check between enemy projectiles and the player.
   checkProjectilePlayerCollision() {
     const playerBounds = this.player.getBounds();
     this.enemyProjectiles.getChildren().forEach((proj) => {
@@ -276,8 +277,9 @@ class BattleArena extends Phaser.Scene {
       const enemy = this.physics.add.sprite(xPos, 80, "enemy");
       enemy.setCollideWorldBounds(true);
       enemy.setBounce(1);
-      enemy.setData("health", 100);
-      enemy.setTint(0xffffff);
+      // Set enemy health to 50 for the new progression.
+      enemy.setData("health", 50);
+      enemy.setTint(0xffffff); // Not hit.
       this.enemies.add(enemy);
     }
   }
@@ -352,6 +354,7 @@ class BattleArena extends Phaser.Scene {
   }
 
   blinkPlayer(player) {
+    // Blink the player's sprite 3 times using a simple tween.
     this.tweens.add({
       targets: player,
       alpha: 0,
@@ -461,15 +464,21 @@ class BattleArena extends Phaser.Scene {
   }
 
   updateEnemyColor(enemy) {
-    const hp = enemy.getData("health");
-    if (hp > 75) {
-      enemy.setTint(0xffffff);
-    } else if (hp > 50) {
-      enemy.setTint(0xffcccc);
-    } else if (hp > 25) {
-      enemy.setTint(0xff7777);
+    // New color progression for enemy health (assumes 50 hp max, 10 damage per hit)
+    let hp = enemy.getData("health");
+    if (hp === 50) {
+      enemy.setTint(0xffffff); // White: not hit.
+    } else if (hp > 40) {
+      enemy.setTint(0xffcccc); // Light red: hit once.
+    } else if (hp > 30) {
+      enemy.setTint(0xff9999); // Medium red: hit twice.
+    } else if (hp > 20) {
+      enemy.setTint(0xff6666); // Dark red: hit three times.
+    } else if (hp > 0) {
+      enemy.setTint(0xff3333); // Very dark red: hit four times.
     } else {
-      enemy.setTint(0xff0000);
+      // Enemy is dead; tint doesn't matter.
+      enemy.setTint(0x000000);
     }
   }
 }
