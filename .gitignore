@@ -1,0 +1,16 @@
+# Node modules and build files
+/node_modules
+/frontend/node_modules
+/frontend/build
+
+# Python virtual environment and cache
+/backend/venv
+/backend/__pycache__
+/backend/*.pyc
+
+# Environment variables
+.env
+/backend/.env
+
+# Firebase service account key (keep secure)
+serviceAccountKey.json
