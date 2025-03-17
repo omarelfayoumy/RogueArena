@@ -3,30 +3,30 @@ import Phaser from "phaser";
 class BattleArena extends Phaser.Scene {
   constructor() {
     super({ key: "BattleArena" });
-    this.playerInvulnerable = false;
+    this.gameIsOver = false;
   }
 
   preload() {
     const graphics = this.make.graphics({ x: 0, y: 0, add: false });
 
-    // Player texture: green square
+    // Player texture: green square (40x40)
     graphics.fillStyle(0x00ff00, 1);
     graphics.fillRect(0, 0, 40, 40);
     graphics.generateTexture("player", 40, 40);
 
-    // Enemy texture: white square (will tint when damaged)
+    // Enemy texture: white square (will tint as damaged)
     graphics.clear();
     graphics.fillStyle(0xffffff, 1);
     graphics.fillRect(0, 0, 40, 40);
     graphics.generateTexture("enemy", 40, 40);
 
-    // Player projectile texture: white circle
+    // Player projectile texture: white circle (10x10)
     graphics.clear();
     graphics.fillStyle(0xffffff, 1);
     graphics.fillCircle(5, 5, 5);
     graphics.generateTexture("projectile_up", 10, 10);
 
-    // Enemy projectile texture: red circle
+    // Enemy projectile texture: red circle (10x10)
     graphics.clear();
     graphics.fillStyle(0xff0000, 1);
     graphics.fillCircle(5, 5, 5);
@@ -45,7 +45,6 @@ class BattleArena extends Phaser.Scene {
 
     // Initialize game state.
     this.level = 1;
-    this.playerHealth = 100;
     this.playerSpeed = 250;
     this.baseShots = 1;
     this.playerShots = this.baseShots;
@@ -70,6 +69,9 @@ class BattleArena extends Phaser.Scene {
       "player"
     );
     this.player.setCollideWorldBounds(true);
+    // Store custom properties on the player.
+    this.player.health = 100;
+    this.player.invulnerable = false;
 
     // Spawn initial enemies.
     this.spawnEnemies(this.level);
@@ -86,14 +88,38 @@ class BattleArena extends Phaser.Scene {
     this.upgradeText = null;
 
     // HUD.
-    this.playerHealthText = this.add.text(20, 20, `Health: ${this.playerHealth}`, { fontSize: "18px", fill: "#fff" });
-    this.levelText = this.add.text(20, 50, `Level: ${this.level}`, { fontSize: "18px", fill: "#fff" });
-    this.ultimateBarText = this.add.text(20, 80, `Ultimate: 0/${this.ultimateNeeded}`, { fontSize: "18px", fill: "#fff" });
-    this.add.text(20, 110, "Press SPACE to shoot. Press X to use ultimate when ready.", { fontSize: "14px", fill: "#fff" });
+    this.playerHealthText = this.add.text(
+      20,
+      20,
+      `Health: ${this.player.health}`,
+      { fontSize: "18px", fill: "#fff" }
+    );
+    this.levelText = this.add.text(20, 50, `Level: ${this.level}`, {
+      fontSize: "18px",
+      fill: "#fff",
+    });
+    this.ultimateBarText = this.add.text(
+      20,
+      80,
+      `Ultimate: 0/${this.ultimateNeeded}`,
+      { fontSize: "18px", fill: "#fff" }
+    );
+    this.add.text(
+      20,
+      110,
+      "Press SPACE to shoot. Press X to use ultimate when ready.",
+      { fontSize: "14px", fill: "#fff" }
+    );
 
-    // Collision detection.
-    this.physics.add.overlap(this.playerProjectiles, this.enemies, this.hitEnemy, null, this);
-    this.physics.add.overlap(this.enemyProjectiles, this.player, this.hitPlayer, null, this);
+    // Use overlap for player projectiles and enemies.
+    this.physics.add.overlap(
+      this.playerProjectiles,
+      this.enemies,
+      this.hitEnemy,
+      null,
+      this
+    );
+    // We'll manually check enemy projectile collisions.
 
     // Update enemy AI every second.
     this.time.addEvent({
@@ -105,9 +131,15 @@ class BattleArena extends Phaser.Scene {
   }
 
   update(time, delta) {
-    // If player's health is 0 or below, trigger game over.
-    if (this.playerHealth <= 0 && this.player && this.player.active) {
-      this.gameOver();
+    if (this.gameIsOver) return;
+    if (!this.player || !this.player.active) return;
+
+    // Manual collision check for enemy projectiles.
+    this.checkProjectilePlayerCollision();
+
+    // If player's health is 0 or below, fade out and destroy.
+    if (this.player.health <= 0) {
+      this.fadeOutAndDestroyPlayer();
       return;
     }
 
@@ -115,7 +147,6 @@ class BattleArena extends Phaser.Scene {
       this.checkUpgradeChoice();
       return;
     }
-    if (!this.player || !this.player.active) return;
 
     // Ultimate activation.
     if (Phaser.Input.Keyboard.JustDown(this.keyX) && this.ultimateReady && !this.ultimateActive) {
@@ -146,14 +177,26 @@ class BattleArena extends Phaser.Scene {
     }
   }
 
+  // Manually check collisions between enemy projectiles and the player.
+  checkProjectilePlayerCollision() {
+    const playerBounds = this.player.getBounds();
+    this.enemyProjectiles.getChildren().forEach((proj) => {
+      if (!proj.active) return;
+      const projBounds = proj.getBounds();
+      if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, projBounds)) {
+        this.hitPlayer(proj, this.player);
+      }
+    });
+  }
+
   spawnEnemies(count) {
     for (let i = 0; i < count; i++) {
       const xPos = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.physics.add.sprite(xPos, 80, "enemy");
       enemy.setCollideWorldBounds(true);
-      enemy.setBounce(1); // Bounce off screen edges.
+      enemy.setBounce(1);
       enemy.setData("health", 100);
-      enemy.setTint(0xffffff);
+      enemy.setTint(0xffffff); // Enemy starts white.
       this.enemies.add(enemy);
     }
   }
@@ -175,6 +218,7 @@ class BattleArena extends Phaser.Scene {
     const proj = this.enemyProjectiles.create(enemy.x, enemy.y + 20, "projectile_down");
     proj.setVelocityY(300);
     proj.hasHit = false;
+    proj.body.setAllowGravity(false);
   }
 
   hitEnemy(projectile, enemy) {
@@ -203,44 +247,67 @@ class BattleArena extends Phaser.Scene {
   }
 
   hitPlayer(projectile, player) {
+    // Only process enemy projectiles.
+    if (projectile.texture.key !== "projectile_down") return;
     if (projectile.hasHit) return;
     projectile.hasHit = true;
     projectile.destroy();
 
-    if (this.ultimateActive) return;
-    if (this.playerInvulnerable) return;
+    if (this.ultimateActive || player.invulnerable) return;
 
-    this.playerHealth -= 10;
-    this.playerHealthText.setText(`Health: ${this.playerHealth}`);
-    console.log("Player hit; current health:", this.playerHealth);
+    // Apply damage.
+    player.health -= 10;
+    this.playerHealthText.setText(`Health: ${player.health}`);
+    console.log("Player hit; current health:", player.health);
 
-    // Start temporary invulnerability.
-    this.playerInvulnerable = true;
-    // Flash the player to indicate a hit.
-    this.flashPlayer();
-    this.time.delayedCall(500, () => {
-      this.playerInvulnerable = false;
-      console.log("Player invulnerability ended.");
-    });
-
-    if (this.playerHealth <= 0) {
-      this.gameOver();
+    if (player.health > 0) {
+      player.invulnerable = true;
+      this.blinkPlayer(player);
+      this.time.delayedCall(500, () => {
+        player.invulnerable = false;
+        console.log("Player invulnerability ended.");
+      });
+    } else {
+      this.fadeOutAndDestroyPlayer();
     }
   }
 
-  // Flash the player sprite 3 times.
-  flashPlayer() {
+  blinkPlayer(player) {
+    // Blink the player's sprite 3 times using a simple tween.
+    this.tweens.add({
+      targets: player,
+      alpha: 0,
+      duration: 100,
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => {
+        player.setAlpha(1);
+      }
+    });
+  }
+
+  fadeOutAndDestroyPlayer() {
+    if (!this.player || !this.player.active) return;
     this.tweens.add({
       targets: this.player,
       alpha: 0,
-      ease: "Linear",
-      duration: 100,
-      yoyo: true,
-      repeat: 3,
+      duration: 500,
       onComplete: () => {
-        this.player.setAlpha(1);
+        this.player.destroy();
+        this.showGameOver();
       }
     });
+  }
+
+  showGameOver() {
+    this.add.text(
+      this.scale.width / 2 - 100,
+      this.scale.height / 2,
+      "Game Over!",
+      { fontSize: "48px", fill: "#fff" }
+    );
+    this.scene.pause();
+    this.gameIsOver = true;
   }
 
   nextLevel() {
@@ -286,6 +353,12 @@ class BattleArena extends Phaser.Scene {
 
   updateAllEnemiesAI() {
     this.enemies.getChildren().forEach((enemy) => {
+      // Clamp enemy x-position within screen bounds.
+      if (enemy.x < enemy.width / 2) {
+        enemy.x = enemy.width / 2;
+      } else if (enemy.x > this.scale.width - enemy.width / 2) {
+        enemy.x = this.scale.width - enemy.width / 2;
+      }
       if (enemy.active) {
         this.enemyAIMove(enemy);
       }
@@ -311,13 +384,13 @@ class BattleArena extends Phaser.Scene {
   updateEnemyColor(enemy) {
     const hp = enemy.getData("health");
     if (hp > 75) {
-      enemy.setTint(0xffffff);
+      enemy.setTint(0xffffff); // White.
     } else if (hp > 50) {
-      enemy.setTint(0xffcccc);
+      enemy.setTint(0xffcccc); // Light red.
     } else if (hp > 25) {
-      enemy.setTint(0xff7777);
+      enemy.setTint(0xff7777); // Medium red.
     } else {
-      enemy.setTint(0xff0000);
+      enemy.setTint(0xff0000); // Dark red.
     }
   }
 
@@ -346,24 +419,6 @@ class BattleArena extends Phaser.Scene {
     this.ultimateActive = false;
     this.playerShots = this.baseShots;
     this.ultimateBarText.setText(`Ultimate: 0/${this.ultimateNeeded}`);
-  }
-
-  gameOver() {
-    // Explicitly ensure we do not destroy the player if health is above 0.
-    if (this.playerHealth > 0) {
-      console.log("GameOver not triggered because player health is above 0");
-      return;
-    }
-    if (this.player && this.player.active) {
-      this.player.destroy();
-      this.add.text(
-        this.scale.width / 2 - 100,
-        this.scale.height / 2,
-        "Game Over!",
-        { fontSize: "48px", fill: "#fff" }
-      );
-      this.scene.pause();
-    }
   }
 }
 
