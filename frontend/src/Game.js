@@ -84,6 +84,19 @@ class BattleArena extends Phaser.Scene {
     this.key1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
     this.key2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
     this.key3 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE);
+
+    // Dev mode keys.
+    this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    this.keyU = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.U);
+    this.keyJ = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+    this.keyI = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
+    this.keyK = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.K);
+    this.keyO = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O);
+    this.keyL = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.L);
+    this.devMode = false;
+    this.devText = this.add.text(20, 140, "", { fontSize: "16px", fill: "#fff" });
+    this.devText.setVisible(false);
+
     this.isChoosingUpgrade = false;
     this.upgradeText = null;
 
@@ -131,6 +144,39 @@ class BattleArena extends Phaser.Scene {
   }
 
   update(time, delta) {
+    // Dev mode toggle and adjustments.
+    if (Phaser.Input.Keyboard.JustDown(this.keyD)) {
+      this.devMode = !this.devMode;
+      this.devText.setVisible(this.devMode);
+    }
+    if (this.devMode) {
+      if (Phaser.Input.Keyboard.JustDown(this.keyU)) {
+        this.playerSpeed += 10;
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.keyJ)) {
+        this.playerSpeed = Math.max(50, this.playerSpeed - 10);
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.keyI)) {
+        this.playerDamage += 1;
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.keyK)) {
+        this.playerDamage = Math.max(1, this.playerDamage - 1);
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.keyO)) {
+        this.baseShots += 1;
+        this.playerShots = this.baseShots;
+      }
+      if (Phaser.Input.Keyboard.JustDown(this.keyL)) {
+        this.baseShots = Math.max(1, this.baseShots - 1);
+        this.playerShots = this.baseShots;
+      }
+      this.devText.setText(
+        "Dev Mode:\nSpeed: " + this.playerSpeed +
+        "\nDamage: " + this.playerDamage +
+        "\nProjectiles: " + this.baseShots
+      );
+    }
+
     if (this.gameIsOver) return;
     if (!this.player || !this.player.active) return;
 
@@ -177,7 +223,7 @@ class BattleArena extends Phaser.Scene {
     }
   }
 
-  // Manually check collisions between enemy projectiles and the player.
+  // Manual collision check between enemy projectiles and the player.
   checkProjectilePlayerCollision() {
     const playerBounds = this.player.getBounds();
     this.enemyProjectiles.getChildren().forEach((proj) => {
@@ -247,7 +293,6 @@ class BattleArena extends Phaser.Scene {
   }
 
   hitPlayer(projectile, player) {
-    // Only process enemy projectiles.
     if (projectile.texture.key !== "projectile_down") return;
     if (projectile.hasHit) return;
     projectile.hasHit = true;
@@ -255,7 +300,6 @@ class BattleArena extends Phaser.Scene {
 
     if (this.ultimateActive || player.invulnerable) return;
 
-    // Apply damage.
     player.health -= 10;
     this.playerHealthText.setText(`Health: ${player.health}`);
     console.log("Player hit; current health:", player.health);
@@ -321,6 +365,8 @@ class BattleArena extends Phaser.Scene {
 
   promptUpgrade() {
     this.isChoosingUpgrade = true;
+    // Pause physics so that the game effectively pauses.
+    this.physics.pause();
     this.upgradeText = this.add.text(
       this.scale.width / 2 - 150,
       this.scale.height / 2 - 40,
@@ -349,18 +395,19 @@ class BattleArena extends Phaser.Scene {
       this.upgradeText.destroy();
       this.upgradeText = null;
     }
+    // Resume physics when upgrade selection is finished.
+    this.physics.resume();
   }
 
   updateAllEnemiesAI() {
     this.enemies.getChildren().forEach((enemy) => {
-      // Clamp enemy x-position within screen bounds.
+      if (enemy.active) {
+        this.enemyAIMove(enemy);
+      }
       if (enemy.x < enemy.width / 2) {
         enemy.x = enemy.width / 2;
       } else if (enemy.x > this.scale.width - enemy.width / 2) {
         enemy.x = this.scale.width - enemy.width / 2;
-      }
-      if (enemy.active) {
-        this.enemyAIMove(enemy);
       }
     });
   }
@@ -384,41 +431,14 @@ class BattleArena extends Phaser.Scene {
   updateEnemyColor(enemy) {
     const hp = enemy.getData("health");
     if (hp > 75) {
-      enemy.setTint(0xffffff); // White.
+      enemy.setTint(0xffffff);
     } else if (hp > 50) {
-      enemy.setTint(0xffcccc); // Light red.
+      enemy.setTint(0xffcccc);
     } else if (hp > 25) {
-      enemy.setTint(0xff7777); // Medium red.
+      enemy.setTint(0xff7777);
     } else {
-      enemy.setTint(0xff0000); // Dark red.
+      enemy.setTint(0xff0000);
     }
-  }
-
-  activateUltimate() {
-    this.ultimateActive = true;
-    this.ultimateReady = false;
-    this.enemiesKilledThisBar = 0;
-    this.ultimateTimeLeft = 30;
-    this.playerShots = this.baseShots + 2;
-    this.ultimateBarText.setText(`ULTIMATE ACTIVE: ${this.ultimateTimeLeft}s`);
-    this.ultimateTimer = this.time.addEvent({
-      delay: 1000,
-      repeat: 29,
-      callback: () => {
-        this.ultimateTimeLeft--;
-        if (this.ultimateTimeLeft > 0) {
-          this.ultimateBarText.setText(`ULTIMATE ACTIVE: ${this.ultimateTimeLeft}s`);
-        } else {
-          this.deactivateUltimate();
-        }
-      }
-    });
-  }
-
-  deactivateUltimate() {
-    this.ultimateActive = false;
-    this.playerShots = this.baseShots;
-    this.ultimateBarText.setText(`Ultimate: 0/${this.ultimateNeeded}`);
   }
 }
 
