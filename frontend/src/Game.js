@@ -97,6 +97,22 @@ class BattleArena extends Phaser.Scene {
     this.devText = this.add.text(20, 140, "", { fontSize: "16px", fill: "#fff" });
     this.devText.setVisible(false);
 
+    // Pause key.
+    this.keyP = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
+    this.isPaused = false;
+    this.pauseOverlay = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x808080, 0.5)
+      .setOrigin(0, 0)
+      .setDepth(10)
+      .setVisible(false);
+    this.pauseText = this.add.text(this.scale.width/2, this.scale.height/2, "Game Paused\nPress P to Resume", {
+      fontSize: "32px",
+      fill: "#fff",
+      align: "center"
+    })
+      .setOrigin(0.5)
+      .setDepth(11)
+      .setVisible(false);
+
     this.isChoosingUpgrade = false;
     this.upgradeText = null;
 
@@ -120,7 +136,7 @@ class BattleArena extends Phaser.Scene {
     this.add.text(
       20,
       110,
-      "Press SPACE to shoot. Press X to use ultimate when ready.",
+      "Press SPACE to shoot. Press X to use ultimate when ready. Press P to Pause.",
       { fontSize: "14px", fill: "#fff" }
     );
 
@@ -144,10 +160,29 @@ class BattleArena extends Phaser.Scene {
   }
 
   update(time, delta) {
+    // Pause toggle.
+    if (Phaser.Input.Keyboard.JustDown(this.keyP)) {
+      if (this.isPaused) {
+        this.isPaused = false;
+        this.physics.resume();
+        this.pauseOverlay.setVisible(false);
+        this.pauseText.setVisible(false);
+      } else {
+        this.isPaused = true;
+        this.physics.pause();
+        this.pauseOverlay.setVisible(true);
+        this.pauseText.setVisible(true);
+        return;
+      }
+    }
+    if (this.isPaused) return;
+
     // Dev mode toggle and adjustments.
     if (Phaser.Input.Keyboard.JustDown(this.keyD)) {
       this.devMode = !this.devMode;
-      this.devText.setVisible(this.devMode);
+      if(this.devText) {
+        this.devText.setVisible(this.devMode);
+      }
     }
     if (this.devMode) {
       if (Phaser.Input.Keyboard.JustDown(this.keyU)) {
@@ -170,11 +205,13 @@ class BattleArena extends Phaser.Scene {
         this.baseShots = Math.max(1, this.baseShots - 1);
         this.playerShots = this.baseShots;
       }
-      this.devText.setText(
-        "Dev Mode:\nSpeed: " + this.playerSpeed +
-        "\nDamage: " + this.playerDamage +
-        "\nProjectiles: " + this.baseShots
-      );
+      if(this.devText) {
+        this.devText.setText(
+          "Dev Mode:\nSpeed: " + this.playerSpeed +
+          "\nDamage: " + this.playerDamage +
+          "\nProjectiles: " + this.baseShots
+        );
+      }
     }
 
     if (this.gameIsOver) return;
@@ -183,7 +220,6 @@ class BattleArena extends Phaser.Scene {
     // Manual collision check for enemy projectiles.
     this.checkProjectilePlayerCollision();
 
-    // If player's health is 0 or below, fade out and destroy.
     if (this.player.health <= 0) {
       this.fadeOutAndDestroyPlayer();
       return;
@@ -199,7 +235,7 @@ class BattleArena extends Phaser.Scene {
       this.activateUltimate();
     }
 
-    // Player movement (2D).
+    // Player movement.
     this.player.setVelocity(0);
     if (this.cursors.left.isDown) {
       this.player.setVelocityX(-this.playerSpeed);
@@ -223,7 +259,6 @@ class BattleArena extends Phaser.Scene {
     }
   }
 
-  // Manual collision check between enemy projectiles and the player.
   checkProjectilePlayerCollision() {
     const playerBounds = this.player.getBounds();
     this.enemyProjectiles.getChildren().forEach((proj) => {
@@ -242,7 +277,7 @@ class BattleArena extends Phaser.Scene {
       enemy.setCollideWorldBounds(true);
       enemy.setBounce(1);
       enemy.setData("health", 100);
-      enemy.setTint(0xffffff); // Enemy starts white.
+      enemy.setTint(0xffffff);
       this.enemies.add(enemy);
     }
   }
@@ -317,7 +352,6 @@ class BattleArena extends Phaser.Scene {
   }
 
   blinkPlayer(player) {
-    // Blink the player's sprite 3 times using a simple tween.
     this.tweens.add({
       targets: player,
       alpha: 0,
@@ -365,7 +399,6 @@ class BattleArena extends Phaser.Scene {
 
   promptUpgrade() {
     this.isChoosingUpgrade = true;
-    // Pause physics so that the game effectively pauses.
     this.physics.pause();
     this.upgradeText = this.add.text(
       this.scale.width / 2 - 150,
@@ -395,7 +428,6 @@ class BattleArena extends Phaser.Scene {
       this.upgradeText.destroy();
       this.upgradeText = null;
     }
-    // Resume physics when upgrade selection is finished.
     this.physics.resume();
   }
 
