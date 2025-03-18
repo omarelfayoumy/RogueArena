@@ -7,18 +7,12 @@ class BattleArena extends Phaser.Scene {
   }
 
   preload() {
+    // Load external images from the public/assets folder (ensure files are placed there)
+    this.load.image("player", "assets/player_spaceship.png");
+    this.load.image("enemy", "assets/enemy_spaceship.png");
+
+    // For projectiles and star, we generate textures.
     const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-
-    // Player texture: green square (40x40)
-    graphics.fillStyle(0x00ff00, 1);
-    graphics.fillRect(0, 0, 40, 40);
-    graphics.generateTexture("player", 40, 40);
-
-    // Enemy texture: white square (will tint as damaged)
-    graphics.clear();
-    graphics.fillStyle(0xffffff, 1);
-    graphics.fillRect(0, 0, 40, 40);
-    graphics.generateTexture("enemy", 40, 40);
 
     // Player projectile texture: white circle (10x10)
     graphics.clear();
@@ -62,14 +56,15 @@ class BattleArena extends Phaser.Scene {
     this.playerProjectiles = this.physics.add.group();
     this.enemyProjectiles = this.physics.add.group();
 
-    // Create the player at the bottom center.
+    // Create the player at the bottom center using the loaded image.
     this.player = this.physics.add.sprite(
       this.scale.width / 2,
       this.scale.height - 60,
       "player"
     );
     this.player.setCollideWorldBounds(true);
-    // Store custom properties on the player.
+    // Downscale player by 5×.
+    this.player.setScale(0.17);
     this.player.health = 100;
     this.player.invulnerable = false;
 
@@ -117,40 +112,15 @@ class BattleArena extends Phaser.Scene {
     this.upgradeText = null;
 
     // HUD.
-    this.playerHealthText = this.add.text(
-      20,
-      20,
-      `Health: ${this.player.health}`,
-      { fontSize: "18px", fill: "#fff" }
-    );
-    this.levelText = this.add.text(20, 50, `Level: ${this.level}`, {
-      fontSize: "18px",
-      fill: "#fff",
-    });
-    this.ultimateBarText = this.add.text(
-      20,
-      80,
-      `Ultimate: 0/${this.ultimateNeeded}`,
-      { fontSize: "18px", fill: "#fff" }
-    );
-    this.add.text(
-      20,
-      110,
-      "Press SPACE to shoot. Press X to use ultimate when ready. Press P to Pause. Press R to Restart.",
+    this.playerHealthText = this.add.text(20, 20, `Health: ${this.player.health}`, { fontSize: "18px", fill: "#fff" });
+    this.levelText = this.add.text(20, 50, `Level: ${this.level}`, { fontSize: "18px", fill: "#fff" });
+    this.ultimateBarText = this.add.text(20, 80, `Ultimate: 0/${this.ultimateNeeded}`, { fontSize: "18px", fill: "#fff" });
+    this.add.text(20, 110, "Press SPACE to shoot. Press X to use ultimate when ready. Press P to Pause. Press R to Restart.",
       { fontSize: "14px", fill: "#fff" }
     );
 
-    // Use overlap for player projectiles and enemies.
-    this.physics.add.overlap(
-      this.playerProjectiles,
-      this.enemies,
-      this.hitEnemy,
-      null,
-      this
-    );
-    // We'll manually check enemy projectile collisions.
+    this.physics.add.overlap(this.playerProjectiles, this.enemies, this.hitEnemy, null, this);
 
-    // Update enemy AI every second.
     this.time.addEvent({
       delay: 1000,
       callback: this.updateAllEnemiesAI,
@@ -158,10 +128,10 @@ class BattleArena extends Phaser.Scene {
       loop: true,
     });
 
-    // Add global listener for R key to restart game.
+    // Global restart listener: if the scene is paused (game over) and R is pressed, restart the scene.
     document.addEventListener("keydown", (event) => {
-      if (event.key.toLowerCase() === "r" && this.gameIsOver) {
-        this.restartGame();
+      if (event.key.toLowerCase() === "r" && this.scene.isPaused()) {
+        this.scene.restart();
       }
     });
   }
@@ -192,26 +162,12 @@ class BattleArena extends Phaser.Scene {
       }
     }
     if (this.devMode) {
-      if (Phaser.Input.Keyboard.JustDown(this.keyU)) {
-        this.playerSpeed += 10;
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.keyJ)) {
-        this.playerSpeed = Math.max(50, this.playerSpeed - 10);
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.keyI)) {
-        this.playerDamage += 1;
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.keyK)) {
-        this.playerDamage = Math.max(1, this.playerDamage - 1);
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.keyO)) {
-        this.baseShots += 1;
-        this.playerShots = this.baseShots;
-      }
-      if (Phaser.Input.Keyboard.JustDown(this.keyL)) {
-        this.baseShots = Math.max(1, this.baseShots - 1);
-        this.playerShots = this.baseShots;
-      }
+      if (Phaser.Input.Keyboard.JustDown(this.keyU)) { this.playerSpeed += 10; }
+      if (Phaser.Input.Keyboard.JustDown(this.keyJ)) { this.playerSpeed = Math.max(50, this.playerSpeed - 10); }
+      if (Phaser.Input.Keyboard.JustDown(this.keyI)) { this.playerDamage += 1; }
+      if (Phaser.Input.Keyboard.JustDown(this.keyK)) { this.playerDamage = Math.max(1, this.playerDamage - 1); }
+      if (Phaser.Input.Keyboard.JustDown(this.keyO)) { this.baseShots += 1; this.playerShots = this.baseShots; }
+      if (Phaser.Input.Keyboard.JustDown(this.keyL)) { this.baseShots = Math.max(1, this.baseShots - 1); this.playerShots = this.baseShots; }
       if (this.devText) {
         this.devText.setText(
           "Dev Mode:\nSpeed: " + this.playerSpeed +
@@ -224,7 +180,6 @@ class BattleArena extends Phaser.Scene {
     if (this.gameIsOver) return;
     if (!this.player || !this.player.active) return;
 
-    // Manual collision check for enemy projectiles.
     this.checkProjectilePlayerCollision();
 
     if (this.player.health <= 0) {
@@ -237,36 +192,23 @@ class BattleArena extends Phaser.Scene {
       return;
     }
 
-    // Ultimate activation.
     if (Phaser.Input.Keyboard.JustDown(this.keyX) && this.ultimateReady && !this.ultimateActive) {
       this.activateUltimate();
     }
 
-    // Player movement.
     this.player.setVelocity(0);
-    if (this.cursors.left.isDown) {
-      this.player.setVelocityX(-this.playerSpeed);
-    } else if (this.cursors.right.isDown) {
-      this.player.setVelocityX(this.playerSpeed);
-    }
-    if (this.cursors.up.isDown) {
-      this.player.setVelocityY(-this.playerSpeed);
-    } else if (this.cursors.down.isDown) {
-      this.player.setVelocityY(this.playerSpeed);
-    }
+    if (this.cursors.left.isDown) { this.player.setVelocityX(-this.playerSpeed); }
+    else if (this.cursors.right.isDown) { this.player.setVelocityX(this.playerSpeed); }
+    if (this.cursors.up.isDown) { this.player.setVelocityY(-this.playerSpeed); }
+    else if (this.cursors.down.isDown) { this.player.setVelocityY(this.playerSpeed); }
 
-    // Shooting.
-    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      this.shootPlayerProjectiles();
-    }
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) { this.shootPlayerProjectiles(); }
 
-    // Ultimate bar update.
     if (!this.ultimateActive && this.ultimateReady) {
       this.ultimateBarText.setText("Ultimate: Ready! Press X");
     }
   }
 
-  // Manual collision check between enemy projectiles and the player.
   checkProjectilePlayerCollision() {
     const playerBounds = this.player.getBounds();
     this.enemyProjectiles.getChildren().forEach((proj) => {
@@ -282,11 +224,13 @@ class BattleArena extends Phaser.Scene {
     for (let i = 0; i < count; i++) {
       const xPos = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.physics.add.sprite(xPos, 80, "enemy");
+      enemy.setScale(0.1);
+      enemy.setFlipY(true);
       enemy.setCollideWorldBounds(true);
       enemy.setBounce(1);
-      // Set enemy health to 50 for the new progression.
       enemy.setData("health", 50);
-      enemy.setTint(0xffffff); // Not hit.
+      enemy.setTint(0xffffff);
+      // (Hitbox adjustments for enemy are not changed here per your request.)
       this.enemies.add(enemy);
     }
   }
@@ -330,9 +274,7 @@ class BattleArena extends Phaser.Scene {
       if (!this.ultimateActive) {
         this.ultimateBarText.setText(`Ultimate: ${this.enemiesKilledThisBar}/${this.ultimateNeeded}`);
       }
-      if (this.enemies.countActive(true) === 0) {
-        this.nextLevel();
-      }
+      if (this.enemies.countActive(true) === 0) { this.nextLevel(); }
     }
   }
 
@@ -367,9 +309,7 @@ class BattleArena extends Phaser.Scene {
       duration: 100,
       yoyo: true,
       repeat: 2,
-      onComplete: () => {
-        player.setAlpha(1);
-      }
+      onComplete: () => { player.setAlpha(1); }
     });
   }
 
@@ -442,14 +382,9 @@ class BattleArena extends Phaser.Scene {
 
   updateAllEnemiesAI() {
     this.enemies.getChildren().forEach((enemy) => {
-      if (enemy.active) {
-        this.enemyAIMove(enemy);
-      }
-      if (enemy.x < enemy.width / 2) {
-        enemy.x = enemy.width / 2;
-      } else if (enemy.x > this.scale.width - enemy.width / 2) {
-        enemy.x = this.scale.width - enemy.width / 2;
-      }
+      if (enemy.active) { this.enemyAIMove(enemy); }
+      if (enemy.x < enemy.width / 2) { enemy.x = enemy.width / 2; }
+      else if (enemy.x > this.scale.width - enemy.width / 2) { enemy.x = this.scale.width - enemy.width / 2; }
     });
   }
 
@@ -470,21 +405,13 @@ class BattleArena extends Phaser.Scene {
   }
 
   updateEnemyColor(enemy) {
-    // New color progression for enemy health (assumes 50 hp max, 10 damage per hit)
     let hp = enemy.getData("health");
-    if (hp === 50) {
-      enemy.setTint(0xffffff); // White: not hit.
-    } else if (hp > 40) {
-      enemy.setTint(0xffcccc); // Light red: hit once.
-    } else if (hp > 30) {
-      enemy.setTint(0xff9999); // Medium red: hit twice.
-    } else if (hp > 20) {
-      enemy.setTint(0xff6666); // Dark red: hit three times.
-    } else if (hp > 0) {
-      enemy.setTint(0xff3333); // Very dark red: hit four times.
-    } else {
-      enemy.setTint(0x000000);
-    }
+    if (hp === 50) { enemy.setTint(0xffffff); }
+    else if (hp > 40) { enemy.setTint(0xffcccc); }
+    else if (hp > 30) { enemy.setTint(0xff9999); }
+    else if (hp > 20) { enemy.setTint(0xff6666); }
+    else if (hp > 0) { enemy.setTint(0xff3333); }
+    else { enemy.setTint(0x000000); }
   }
 
   // Ultimate functions.
@@ -515,11 +442,9 @@ class BattleArena extends Phaser.Scene {
     this.ultimateBarText.setText(`Ultimate: 0/${this.ultimateNeeded}`);
   }
 
-  // New restart function built from scratch.
+  // Restart function (DO NOT TOUCH THIS FUNCTION).
   restartGame() {
-    // Reset gameIsOver flag.
     this.gameIsOver = false;
-    // Restart the scene.
     this.scene.restart();
   }
 }
