@@ -17,7 +17,7 @@ class BattleArena extends Phaser.Scene {
 
     // Player projectile texture: white circle (10x10)
     graphics.clear();
-    graphics.fillStyle(0xffffff, 1);
+    graphics.fillStyle(0x00ffff, 1);
     graphics.fillCircle(5, 5, 5);
     graphics.generateTexture("projectile_up", 10, 10);
 
