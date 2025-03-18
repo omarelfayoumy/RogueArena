@@ -10,6 +10,7 @@ class BattleArena extends Phaser.Scene {
     // Load external images from the public/assets folder (ensure files are placed there)
     this.load.image("player", "assets/player_spaceship.png");
     this.load.image("enemy", "assets/enemy_spaceship.png");
+    this.load.image("background", "assets/background.jpg");
 
     // For projectiles and star, we generate textures.
     const graphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -34,8 +35,13 @@ class BattleArena extends Phaser.Scene {
   }
 
   create() {
-    // Set background color to black.
-    this.cameras.main.setBackgroundColor("#000000");
+    // Remove any default margins and padding.
+    document.body.style.margin = "0";
+    document.body.style.padding = "0";
+    document.body.style.overflow = "hidden";
+
+    // Add the background image stretched to cover the full screen.
+    this.add.image(0, 0, "background").setOrigin(0, 0).setDisplaySize(this.scale.width, this.scale.height);
 
     // Initialize game state.
     this.level = 1;
@@ -43,7 +49,6 @@ class BattleArena extends Phaser.Scene {
     this.baseShots = 1;
     this.playerShots = this.baseShots;
     this.playerDamage = 20;
-
     this.enemiesKilled = 0;
     this.enemiesKilledThisBar = 0;
     this.ultimateNeeded = 20;
@@ -128,9 +133,9 @@ class BattleArena extends Phaser.Scene {
       loop: true,
     });
 
-    // Global restart listener: if the scene is paused (game over) and R is pressed, restart the scene.
+    // Global restart listener: if the game is over (scene paused) and R is pressed, restart.
     document.addEventListener("keydown", (event) => {
-      if (event.key.toLowerCase() === "r" && this.scene.isPaused()) {
+      if (event.key.toLowerCase() === "r" && this.gameIsOver) {
         this.scene.restart();
       }
     });
@@ -230,7 +235,6 @@ class BattleArena extends Phaser.Scene {
       enemy.setBounce(1);
       enemy.setData("health", 50);
       enemy.setTint(0xffffff);
-      // (Hitbox adjustments for enemy are not changed here per your request.)
       this.enemies.add(enemy);
     }
   }
