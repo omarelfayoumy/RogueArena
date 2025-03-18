@@ -136,7 +136,7 @@ class BattleArena extends Phaser.Scene {
     this.add.text(
       20,
       110,
-      "Press SPACE to shoot. Press X to use ultimate when ready. Press P to Pause.",
+      "Press SPACE to shoot. Press X to use ultimate when ready. Press P to Pause. Press R to Restart.",
       { fontSize: "14px", fill: "#fff" }
     );
 
@@ -156,6 +156,13 @@ class BattleArena extends Phaser.Scene {
       callback: this.updateAllEnemiesAI,
       callbackScope: this,
       loop: true,
+    });
+
+    // Add global listener for R key to restart game.
+    document.addEventListener("keydown", (event) => {
+      if (event.key.toLowerCase() === "r" && this.gameIsOver) {
+        this.restartGame();
+      }
     });
   }
 
@@ -354,7 +361,6 @@ class BattleArena extends Phaser.Scene {
   }
 
   blinkPlayer(player) {
-    // Blink the player's sprite 3 times using a simple tween.
     this.tweens.add({
       targets: player,
       alpha: 0,
@@ -382,11 +388,11 @@ class BattleArena extends Phaser.Scene {
 
   showGameOver() {
     this.add.text(
-      this.scale.width / 2 - 100,
+      this.scale.width / 2,
       this.scale.height / 2,
-      "Game Over!",
-      { fontSize: "48px", fill: "#fff" }
-    );
+      "Game Over!\nPress R to Play Again",
+      { fontSize: "48px", fill: "#fff", align: "center" }
+    ).setOrigin(0.5);
     this.scene.pause();
     this.gameIsOver = true;
   }
@@ -404,11 +410,11 @@ class BattleArena extends Phaser.Scene {
     this.isChoosingUpgrade = true;
     this.physics.pause();
     this.upgradeText = this.add.text(
-      this.scale.width / 2 - 150,
+      this.scale.width / 2,
       this.scale.height / 2 - 40,
       "Choose an Upgrade:\n1) +5 Damage\n2) +50 Speed\n3) +1 Projectile",
-      { fontSize: "20px", fill: "#fff" }
-    );
+      { fontSize: "20px", fill: "#fff", align: "center" }
+    ).setOrigin(0.5);
   }
 
   checkUpgradeChoice() {
@@ -477,9 +483,44 @@ class BattleArena extends Phaser.Scene {
     } else if (hp > 0) {
       enemy.setTint(0xff3333); // Very dark red: hit four times.
     } else {
-      // Enemy is dead; tint doesn't matter.
       enemy.setTint(0x000000);
     }
+  }
+
+  // Ultimate functions.
+  activateUltimate() {
+    this.ultimateActive = true;
+    this.ultimateReady = false;
+    this.enemiesKilledThisBar = 0;
+    this.ultimateTimeLeft = 30;
+    this.playerShots = this.baseShots + 2;
+    this.ultimateBarText.setText(`ULTIMATE ACTIVE: ${this.ultimateTimeLeft}s`);
+    this.ultimateTimer = this.time.addEvent({
+      delay: 1000,
+      repeat: 29,
+      callback: () => {
+        this.ultimateTimeLeft--;
+        if (this.ultimateTimeLeft > 0) {
+          this.ultimateBarText.setText(`ULTIMATE ACTIVE: ${this.ultimateTimeLeft}s`);
+        } else {
+          this.deactivateUltimate();
+        }
+      }
+    });
+  }
+
+  deactivateUltimate() {
+    this.ultimateActive = false;
+    this.playerShots = this.baseShots;
+    this.ultimateBarText.setText(`Ultimate: 0/${this.ultimateNeeded}`);
+  }
+
+  // New restart function built from scratch.
+  restartGame() {
+    // Reset gameIsOver flag.
+    this.gameIsOver = false;
+    // Restart the scene.
+    this.scene.restart();
   }
 }
 
